@@ -1,9 +1,6 @@
 <?php
+require_once 'config.php';
 
-$nomor_va="";
-$api_key_ipaymu="871AFB5C-9019-42C7-9063-537FA87A45B2";
-$url_ipaymu="https://sandbox.ipaymu.com/api/v2/payment";
-$api_key_bukaolshop="T0Z6bnlHMDQ5c25YeWNiZTNFbEFvMXYwVngrS2JidnprMGhkeU1tdkNnOTZUZkhCMy9SRXVIWnlwMGN1TlVuVA==";
 
 // Periksa trx_id dan sid apakah tersedia atau tidak
 if(isset($_POST['trx_id']) and isset($_POST['sid'])){
@@ -15,14 +12,14 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
   // Periksa bahwa transaksi_id ini benar-benar sukses atau telah lunas
 
   // Kode periksa transaksi sesuai dokumentasi API iPaymu
-  $body=json_encode(array('transactionId' => $transaksi_id));
+  $body=json_encode(array('transactionId' => $transaksi_id),JSON_UNESCAPED_SLASHES);
   $hased_body=strtolower(hash('sha256', $body));
   $stringToSign=hash_hmac("sha256","POST:$nomor_va:$hased_body:$api_key_ipaymu",$api_key_ipaymu);
 
    // Buat request dengan curl
   $curl = curl_init();
   curl_setopt_array($curl, array(
-    CURLOPT_URL => $url_ipaymu,
+    CURLOPT_URL => $url_ipaymu_check,
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_ENCODING => '',
     CURLOPT_MAXREDIRS => 10,
@@ -38,8 +35,10 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
       'timestamp: '.gmdate('YmdHis')
     ),
   ));
+  
   //Kirim request dengan curl
   $response = curl_exec($curl);
+
   curl_close($curl);
 
   //Terima respons dari curl, ubah string langsung ke json
@@ -52,9 +51,37 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
     // Periksa apakah "StatusDesc" memiliki teks "Berhasil"
     if($json_response->Data->Status=="1" and $json_response->Data->StatusDesc=="Berhasil"){
 
-
+      
+      // Koneksi ke mySQL
+      $koneksi=mysqli_connect($server,$username,$password_sql,$nama_database);
+      if(!$koneksi){
+        exit('Database gagal terkoneksi');
+      }
+     
+     
       //Status pembayaran berhasil, dapatkan data ReferenceId yang merupakan token_topup
-      $token_topup=$json_response->Data->ReferenceId;
+      $token_topup=mysqli_real_escape_string($koneksi,$json_response->Data->ReferenceId);
+      
+      
+      //Periksa apakah status didatabase kita masih pending, jika iya lanjutkan konfirmasi topup
+    if($cek_data_topup=mysqli_query($koneksi,"SELECT * FROM ipaymu_saldo WHERE token_topup='$token_topup';")){
+       if(mysqli_num_rows($cek_data_topup) > 0){
+           
+         $row_ipaymu = mysqli_fetch_assoc($cek_data_topup);
+         if($row_ipaymu['status']=='pending'){
+             mysqli_query($koneksi,"UPDATE `ipaymu_saldo` SET `status` = 'paid' WHERE `token_topup` = '$token_topup';");
+         }else{
+             exit("Data status telah paid");
+         }
+         
+       }else{
+          exit("Data tidak ditemukan");
+       }
+    }else{
+         exit("Data tidak ditemukan");
+    }
+      
+      
 
       
       // Lakukan konfirmasi topup saldo member menggunakan API bukaOlshop
@@ -78,9 +105,9 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
       $hasil = curl_exec($ch);
       curl_close ($ch);
 
+      
       // print respon dari api bukaolshop. Anda dapat melihat respon ini dengan cara menyimpan data $hasil ke database atau simpan kedalam bentuk file.txt
-      echo $hasil;
- 
+     echo $hasil;
 
     }
   }
