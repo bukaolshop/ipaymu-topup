@@ -2,7 +2,7 @@
 require_once 'config.php';
 
 
-//Periksa bahwa data yang masuk cocok dengan secret key diatas.
+//Periksa secret key
 if(isset($_POST['secret_callback'])){
     if(!hash_equals($_POST['secret_callback'],$my_secret_key)){
       // secret_callback tidak cocok, hentikan eksekusi program
