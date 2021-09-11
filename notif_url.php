@@ -2,8 +2,9 @@
 require_once 'config.php';
 
 
-// Periksa trx_id dan sid apakah tersedia atau tidak
-if(isset($_POST['trx_id']) and isset($_POST['sid'])){
+// Periksa trx_id dan sid apakah tersedia atau tidak, cek apakah status transaksi berhasil
+if(isset($_POST['trx_id']) and isset($_POST['sid']) and  isset($_POST['status']) and $_POST['status']=="berhasil"){
+
 
   // Set transaksi_id
   $transaksi_id=$_POST['trx_id'];
@@ -35,7 +36,7 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
       'timestamp: '.gmdate('YmdHis')
     ),
   ));
-  
+ 
   //Kirim request dengan curl
   $response = curl_exec($curl);
 
@@ -47,9 +48,8 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
   //Periksa status respon apakah kode 200, periksa apakah terdapat parameter Data 
   if($json_response->Status=="200" and isset($json_response->Data)){
 
-    //Periksa apakah "Status" memiliki nilai 1 (sesuai dokumentasi, 1 artinya berhasil)
-    // Periksa apakah "StatusDesc" memiliki teks "Berhasil"
-    if($json_response->Data->Status=="1" and $json_response->Data->StatusDesc=="Berhasil"){
+    //Periksa apakah "Status" memiliki nilai 1 atau 6 (sesuai dokumentasi, 1 artinya Berhasil, 6 artinya Menunggu settlement)
+    if($json_response->Data->Status=="1" or $json_response->Data->Status=="6"){
 
       
       // Koneksi ke mySQL
@@ -61,7 +61,7 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
      
       //Status pembayaran berhasil, dapatkan data ReferenceId yang merupakan token_topup
       $token_topup=mysqli_real_escape_string($koneksi,$json_response->Data->ReferenceId);
-      
+      $transaksi_id = mysqli_real_escape_string($koneksi,$transaksi_id);
       
       //Periksa apakah status didatabase kita masih pending, jika iya lanjutkan konfirmasi topup
     if($cek_data_topup=mysqli_query($koneksi,"SELECT * FROM ipaymu_saldo WHERE token_topup='$token_topup';")){
@@ -69,7 +69,7 @@ if(isset($_POST['trx_id']) and isset($_POST['sid'])){
            
          $row_ipaymu = mysqli_fetch_assoc($cek_data_topup);
          if($row_ipaymu['status']=='pending'){
-             mysqli_query($koneksi,"UPDATE `ipaymu_saldo` SET `status` = 'paid' WHERE `token_topup` = '$token_topup';");
+             mysqli_query($koneksi,"UPDATE `ipaymu_saldo` SET `status` = 'paid',`id_trx`='$transaksi_id' WHERE `token_topup` = '$token_topup';");
          }else{
              exit("Data status telah paid");
          }

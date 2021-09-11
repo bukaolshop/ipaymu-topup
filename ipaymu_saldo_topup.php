@@ -18,14 +18,14 @@ if(isset($_POST['secret_callback'])){
   if(empty($_POST['id_user']) or
     empty($_POST['token_topup']) or
     empty($_POST['jumlah_topup']) or
-    empty($_POST['kode_unik']) or
     empty($_POST['total_topup']) or
+    !isset($_POST['kode_unik']) or
     !ctype_digit($_POST['jumlah_topup']) or
     !ctype_digit($_POST['kode_unik']) or
     !ctype_digit($_POST['total_topup']) or 
     $_POST['status']!="ok"){
     // data ada yang kosong atau tidak valid
-    exit("data invalid");
+    exit("data invalids");
   }
   
   
@@ -79,6 +79,10 @@ if(!$koneksi){
 
 
   // Inputkan data biaya topup
+  // Untuk perhitungan berdasarkan %, lakukan perhitungan dari variabel $total_topup, contoh :
+  // $hitung_biaya=(int)$total_topup * 2.3 / 100;
+  // Perhitungan diatas untuk mendapatkan biaya 2.3% dari total topup. Perhitungan persen ini berguna untuk pembayaran QRIS.
+  // Kode dibawah merupakan biaya topup yang sudah fix nilainya. Informasi biaya transaksi bisa dilihat di https://ipaymu.com/id/contact-sales/ 
   $produk[]="Biaya topup Rp.3500";
   $qty[]="1";
   $harga[]="3500";
